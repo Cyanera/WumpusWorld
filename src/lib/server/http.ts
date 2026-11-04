@@ -15,6 +15,12 @@ export function instructorId(req: Request): string {
   if (!id) throw new HttpError(401, 'unauthorized');
   return id;
 }
+/** Valid cookie AND the instructor still exists in the database (a stale cookie must force a fresh login). */
+export async function requireInstructor(req: Request, db: ReturnType<typeof getDB>): Promise<string> {
+  const id = instructorId(req);
+  if (!(await db.get('instructors', id))) throw new HttpError(401, 'unauthorized');
+  return id;
+}
 export async function body<T = any>(req: Request): Promise<T> {
   try { return (await req.json()) as T; } catch { throw new HttpError(400, 'bad_json'); }
 }
