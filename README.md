@@ -30,7 +30,7 @@ All animation honours `prefers-reduced-motion`. UI primitives are shadcn/ui-styl
 * **Think first.** In Guided mode actions are rejected (`409 checkpoint_pending`) until the checkpoint is answered; newly inferred knowledge, explanations and formulas are withheld until submission. In Challenge mode inferred knowledge is revealed only when the student runs “Mark what the agent knows”.
 * **Realtime.** The server pings Supabase Realtime *Broadcast* (`session:<CODE>`, no game data in payload); clients refetch through authenticated routes. Polling (3–4 s) always runs as fallback, plus refetch on tab-visible/online. Duplicate deliveries are deduplicated with `opId`; writes use optimistic versioning.
 * **Instructor auth.** Email + password from env, signed HttpOnly cookie (HMAC, 12 h), login throttling. Students are anonymous with a random token (stored hashed).
-* Without Supabase env vars the app runs on an **in-memory store** (local demo / tests only; data is lost on restart).
+* Without Supabase env vars the app only runs on an **in-memory store** in development, or in production when `ALLOW_MEMORY_DB=1` is set (local demos only). On Vercel a missing Supabase config returns a clear `503 not_configured` instead of silently losing student sessions.
 
 ## Local development
 ```bash
@@ -38,7 +38,7 @@ npm install
 cp .env.example .env.local   # leave Supabase empty for the in-memory store
 npm run dev                  # http://localhost:3000  (dev instructor login: instructor@example.edu / wumpus)
 npm test                     # unit + integration tests (26)
-npm run build && INSTRUCTOR_PASSWORD=wumpus AUTH_SECRET=some-long-secret npm start
+npm run build && ALLOW_MEMORY_DB=1 INSTRUCTOR_PASSWORD=wumpus AUTH_SECRET=some-long-secret npm start   # ALLOW_MEMORY_DB only for local demos
 npm run test:e2e             # Playwright phone-viewport smoke test against the running server
 ```
 Production builds require `INSTRUCTOR_PASSWORD` and `AUTH_SECRET` (no insecure defaults).

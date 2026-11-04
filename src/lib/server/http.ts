@@ -1,4 +1,4 @@
-import { getDB } from './db';
+import { ConfigError, getDB } from './db';
 import { COOKIE, readInstructorCookie } from './auth';
 import { HttpError } from './service';
 
@@ -24,6 +24,7 @@ export function handler(fn: (req: Request, ctx: any, db: ReturnType<typeof getDB
   return async (req: Request, ctx?: any) => {
     try { return await fn(req, ctx, getDB()); }
     catch (e) {
+      if (e instanceof ConfigError) { console.error('[config]', e.message); return json({ error: 'not_configured', message: e.message }, 503); }
       if (e instanceof HttpError) return json({ error: e.code }, e.status);
       console.error('[api]', e);
       return json({ error: 'server_error' }, 500);

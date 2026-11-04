@@ -95,16 +95,21 @@ export class SupabaseDB implements DB {
   }
 }
 
+export class ConfigError extends Error {}
 let singleton: DB | null = null;
 export function getDB(): DB {
   if (singleton) return singleton;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (url && key) singleton = new SupabaseDB(createClient(url, key, { auth: { persistSession: false }, global: { fetch: (u: any, o: any) => fetch(u, { ...o, cache: 'no-store' }) } }));
   else {
+    // In production a missing Supabase config must be a loud error: the in-memory store is per serverless instance,
+    // so students would randomly "lose" their session. Opt in explicitly (ALLOW_MEMORY_DB=1) for local demos only.
+    if (process.env.NODE_ENV === 'production' && process.env.ALLOW_MEMORY_DB !== '1') {
+      throw new ConfigError('Supabase is not configured: set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY for the Production environment, then redeploy.');
+    }
     const g = globalThis as any;
     g.__wwMemDB ??= new MemoryDB();
     singleton = g.__wwMemDB;
-    if (process.env.NODE_ENV === 'production') console.warn('[wumpus] Supabase env vars missing: using the in-memory store (data is lost on restart).');
   }
   return singleton!;
 }
