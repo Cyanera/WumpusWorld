@@ -48,3 +48,11 @@ body { font-family: system-ui, 'Segoe UI', Tahoma, 'Noto Sans Arabic', sans-seri
   .fx-stench .puff { opacity: .7; } .fx-glitter .spark { opacity: 1; transform: scale(.9); }
   .strike-anim::after { width: 100%; }
 }
+
+/* ---------- light theme (opt-in). Dark is the default. Implemented as a colour inversion of the whole UI,
+   with illustrations / QR codes inverted back so their real colours are preserved. ---------- */
+html[data-theme='light'] { filter: invert(1) hue-rotate(180deg); }
+html[data-theme='light'] .keep-color { filter: invert(1) hue-rotate(180deg); }
+html[data-theme='light'] img.keep-color, html[data-theme='light'] .fx-keep { filter: invert(1) hue-rotate(180deg); }
+/* keep text on amber buttons dark after the light-theme inversion */
+html[data-theme='light'] .bg-amber-500.text-black { color: #fff; }

@@ -5,6 +5,7 @@ import { Maximize2, Shuffle, Users, ArrowRight } from 'lucide-react';
 import { api } from '@/lib/client/api';
 import { Button } from '../ui/button';
 import { Replay } from '../game/Replay';
+import { ThemeToggle } from '../ThemeToggle';
 
 /** Full-screen projector mode: step through a student's recorded game or a fresh random demo. */
 export default function DemoMode({ code }: { code: string }) {
@@ -23,6 +24,7 @@ export default function DemoMode({ code }: { code: string }) {
         <Link href={`/instructor/s/${code}`}><Button variant="outline"><ArrowRight />اللوحة</Button></Link>
         <h1 className="text-3xl font-black">وضع العرض · Demonstration</h1>
         <div className="ms-auto flex flex-wrap items-center gap-2">
+          <ThemeToggle className="h-12 w-12" />
           <select value={src} onChange={(e) => setSrc(e.target.value)} className="h-12 rounded-xl border border-cave-600 bg-cave-900 px-3" aria-label="مصدر العرض">
             <option value="fresh">لعبة جديدة عشوائية (Perfect Agent)</option>{students.map((s) => <option key={s.id} value={s.id}>لعبة {s.name}</option>)}</select>
           {src === 'fresh' && <Button variant="secondary" onClick={() => setNonce(nonce + 1)}><Shuffle />لعبة جديدة</Button>}

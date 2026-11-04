@@ -150,7 +150,7 @@ function summarize(prev: Summary, state: GameState, ended: boolean, justEnded: b
 
 async function auth(db: DB, pid: string, token: string | null | undefined) {
   const p = await db.get('participants', pid);
-  if (!p || !tokenMatches(token, p.token_hash)) return fail(401, 'unauthorized');
+  if (!p || !tokenMatches(token, p.token_hash)) { console.warn('[auth] rejected', !p ? 'participant-not-found' : 'token-mismatch', pid); return fail(401, 'unauthorized'); }
   const s = await db.get('classroom_sessions', p.session_id);
   if (!s) return fail(404, 'session_not_found');
   return { p, s };
@@ -238,7 +238,7 @@ type Mutator = (g: Row, world: World) => Output | { error: string };
 
 async function mutate(db: DB, pid: string, token: string | null | undefined, opId: string | undefined, fn: Mutator) {
   const p = await db.get('participants', pid);
-  if (!p || !tokenMatches(token, p.token_hash)) return fail(401, 'unauthorized');
+  if (!p || !tokenMatches(token, p.token_hash)) { console.warn('[auth] rejected(mutate)', !p ? 'participant-not-found' : 'token-mismatch', pid); return fail(401, 'unauthorized'); }
   for (let attempt = 0; attempt < 3; attempt++) {
     // stage 1: session + latest game in parallel
     const [s, g] = await Promise.all([db.get('classroom_sessions', p.session_id), latestGame(db, pid)]);

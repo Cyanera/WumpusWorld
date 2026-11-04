@@ -1,7 +1,7 @@
 import * as React from 'react';
 
 type P = { className?: string; style?: React.CSSProperties };
-const base = 'absolute inset-0 h-full w-full pointer-events-none';
+const base = 'keep-color absolute inset-0 h-full w-full pointer-events-none';
 
 /** A real-looking monster: horns, glowing eyes, fangs, claws. */
 export function WumpusArt({ className = '', dead = false }: P & { dead?: boolean }) {

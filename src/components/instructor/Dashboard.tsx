@@ -13,6 +13,7 @@ import { Replay, replayCells } from '../game/Replay';
 import { CaveGrid } from '../game/CaveGrid';
 import { RecordCard, Legend } from '../game/LogicSection';
 import { cn } from '@/lib/utils';
+import { ThemeToggle } from '../ThemeToggle';
 import type { InferenceRecord } from '@/lib/engine/reasoner';
 import { Pos } from '@/lib/engine/types';
 
@@ -42,6 +43,7 @@ export default function Dashboard({ code }: { code: string }) {
         <div className="rounded-2xl bg-cave-800 px-4 py-2 text-center"><div className="text-xs text-slate-400">رمز الانضمام</div><div className="font-mono text-3xl font-black tracking-[0.25em] text-amber-300" dir="ltr">{s.code}</div></div>
         <Badge className="text-base" tone={s.status === 'active' ? 'green' : s.status === 'paused' ? 'amber' : 'default'}>{STATUS_AR[s.status]}</Badge>
         <div className="ms-auto flex flex-wrap gap-2">
+          <ThemeToggle className="h-12 w-12" />
           {s.status === 'lobby' && <Button size="lg" variant="success" onClick={() => ctl('start')}><Play />بدء النشاط</Button>}
           {s.status === 'active' && <Button size="lg" variant="secondary" onClick={() => ctl('pause')}><Pause />إيقاف مؤقت</Button>}
           {s.status === 'paused' && <Button size="lg" variant="success" onClick={() => ctl('resume')}><Play />استئناف</Button>}
@@ -217,7 +219,7 @@ function QrModal({ code, onClose }: { code: string; onClose: () => void }) {
   React.useEffect(() => { QRCode.toDataURL(url, { width: 520, margin: 2, color: { dark: '#0b0a12', light: '#ffffff' } }).then(setSrc); }, [url]);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4" onClick={onClose} role="dialog" aria-modal="true" aria-label="رمز QR للانضمام">
-      <div className="rounded-3xl bg-white p-6 text-center text-black" onClick={(e) => e.stopPropagation()}>
+      <div className="keep-color rounded-3xl bg-white p-6 text-center text-black" onClick={(e) => e.stopPropagation()}>
         {src && <img src={src} alt={`QR code to join ${code}`} className="mx-auto h-[min(70vh,520px)] w-auto" />}
         <p className="mt-2 text-2xl font-black">امسحي الرمز أو ادخلي الرمز</p><p className="font-mono text-6xl font-black tracking-[0.3em]" dir="ltr">{code}</p><p className="mt-1 text-sm text-slate-600" dir="ltr">{url}</p>
         <Button className="mt-3" onClick={onClose}>إغلاق</Button>

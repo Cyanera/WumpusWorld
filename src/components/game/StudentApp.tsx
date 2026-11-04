@@ -16,6 +16,7 @@ import type { StudentGameView } from '@/lib/engine/game';
 import { Label, Pos } from '@/lib/engine/types';
 import { TASK_LABELS } from '@/lib/engine/checkpoints';
 import { cn } from '@/lib/utils';
+import { ThemeToggle } from '../ThemeToggle';
 
 interface Payload {
   session: { code: string; title: string; status: string; mode: string; remainingSec: number; serverNow: number; durationMinutes: number };
@@ -33,6 +34,7 @@ export default function StudentApp({ code }: { code: string }) {
   const [busy, setBusy] = React.useState(false);
   const fetchedAt = React.useRef(Date.now());
   const inflight = React.useRef(0);
+  const authFails = React.useRef(0);
   const chain = React.useRef<Promise<unknown>>(Promise.resolve());
   const [now, setNow] = React.useState(Date.now());
 
@@ -43,9 +45,10 @@ export default function StudentApp({ code }: { code: string }) {
     if (!creds || inflight.current > 0) return;
     try {
       const d = await api<Payload>('/api/play/state', { pid: creds.pid, token: creds.token });
-      fetchedAt.current = Date.now(); setData(d); setOnline(true); setErr(null);
+      fetchedAt.current = Date.now(); setData(d); setOnline(true); setErr(null); authFails.current = 0;
     } catch (e) {
-      if (e instanceof ApiError && e.status === 401) { localStorage.removeItem(store(code)); setCreds(null); }
+      // Only forget the student after repeated, explicit 'unauthorized' answers from OUR api (never on a proxy/network hiccup)
+      if (e instanceof ApiError && e.status === 401 && e.code === 'unauthorized') { if (++authFails.current >= 4) { localStorage.removeItem(store(code)); setCreds(null); } }
       else setOnline(false);
     }
   }, [creds, code]);
@@ -139,7 +142,7 @@ function Header({ data, remaining, online }: { data: Payload; remaining: number;
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0"><h1 className="truncate text-base font-black leading-tight">Wumpus World <span className="font-medium text-slate-400">· Think Like an AI Agent</span></h1><p className="truncate text-xs text-slate-300">{data.me.name}</p></div>
         <div className="flex items-center gap-2 text-sm font-bold">
-          {online ? <Wifi className="h-4 w-4 text-emerald-400" aria-label="Online" /> : <WifiOff className="h-4 w-4 text-red-400" aria-label="Offline, reconnecting" />}
+          <ThemeToggle />{online ? <Wifi className="h-4 w-4 text-emerald-400" aria-label="Online" /> : <WifiOff className="h-4 w-4 text-red-400" aria-label="Offline, reconnecting" />}
           <span className={cn('flex items-center gap-1 rounded-lg px-2 py-1', remaining < 60 && data.session.status === 'active' ? 'bg-red-900' : 'bg-cave-800')}><Clock className="h-4 w-4" aria-hidden />{fmtTime(remaining)}</span>
         </div>
       </div>
