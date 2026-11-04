@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@import 'katex/dist/katex.min.css';
+
+:root { color-scheme: dark; }
+html, body { background: #0b0a12; color: #ece9f7; -webkit-tap-highlight-color: transparent; }
+body { font-family: system-ui, 'Segoe UI', Tahoma, 'Noto Sans Arabic', sans-serif; }
+.katex { font-size: 1.02em; }
+.katex-display { margin: 0.4em 0; overflow-x: auto; overflow-y: hidden; }
+.formula-scroll { overflow-x: auto; max-width: 100%; padding-bottom: 2px; }
+
+/* ---------- illustrated effects ---------- */
+@keyframes breeze-dash { from { stroke-dashoffset: 60; } to { stroke-dashoffset: 0; } }
+@keyframes breeze-sway { 0%,100% { transform: translateX(-3px); opacity: .55; } 50% { transform: translateX(4px); opacity: 1; } }
+@keyframes stench-rise { 0% { transform: translateY(6px) scale(.7); opacity: 0; } 30% { opacity: .85; } 100% { transform: translateY(-16px) scale(1.25); opacity: 0; } }
+@keyframes stench-wave { 0%,100% { transform: translateX(-2px); } 50% { transform: translateX(2px); } }
+@keyframes twinkle { 0%,100% { transform: scale(.4) rotate(0); opacity: .2; } 50% { transform: scale(1.1) rotate(45deg); opacity: 1; } }
+@keyframes glow-pulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+@keyframes eye-glow { 0%,100% { filter: drop-shadow(0 0 2px #fde047); } 50% { filter: drop-shadow(0 0 7px #f97316); } }
+@keyframes fog-drift { 0% { background-position: 0 0, 40px 20px; } 100% { background-position: 80px 30px, 0 60px; } }
+@keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+@keyframes pop-in { 0% { transform: scale(.6); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+@keyframes strike { from { width: 0; } to { width: 100%; } }
+.fx-breeze path { stroke-dasharray: 60; animation: breeze-dash 2.2s linear infinite, breeze-sway 3s ease-in-out infinite; }
+.fx-breeze path:nth-child(2) { animation-delay: .5s; } .fx-breeze path:nth-child(3) { animation-delay: 1s; }
+.fx-stench .puff { animation: stench-rise 3s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+.fx-stench .puff:nth-child(2) { animation-delay: .8s; } .fx-stench .puff:nth-child(3) { animation-delay: 1.6s; } .fx-stench .puff:nth-child(4) { animation-delay: 2.2s; }
+.fx-stench .wave { animation: stench-wave 1.6s ease-in-out infinite; }
+.fx-glitter .spark { animation: twinkle 1.8s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.fx-glitter .spark:nth-child(2) { animation-delay: .4s; } .fx-glitter .spark:nth-child(3) { animation-delay: .9s; } .fx-glitter .spark:nth-child(4) { animation-delay: 1.3s; }
+.fx-glow { animation: glow-pulse 2s ease-in-out infinite; }
+.fx-eyes { animation: eye-glow 2.2s ease-in-out infinite; }
+.fx-bob { animation: bob 2.4s ease-in-out infinite; }
+.fx-pop { animation: pop-in .35s ease-out both; }
+.fog {
+  background-image:
+    radial-gradient(ellipse at 30% 30%, rgba(90,80,130,.55), transparent 60%),
+    radial-gradient(ellipse at 70% 70%, rgba(60,55,100,.6), transparent 55%);
+  background-size: 120px 120px, 140px 140px; animation: fog-drift 18s linear infinite alternate;
+}
+.strike-anim { position: relative; display: inline-block; }
+.strike-anim::after { content: ''; position: absolute; left: 0; top: 52%; height: 2px; background: #f87171; animation: strike .8s ease-out forwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  .fx-breeze path { stroke-dasharray: none; }
+  .fx-stench .puff { opacity: .7; } .fx-glitter .spark { opacity: 1; transform: scale(.9); }
+  .strike-anim::after { width: 100%; }
+}
