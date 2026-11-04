@@ -19,7 +19,7 @@ let sb: ReturnType<typeof createClient> | null = null;
 function client() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL, key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return null;
-  return (sb ??= createClient(url, key, { auth: { persistSession: false }, realtime: { params: { eventsPerSecond: 5 } } }));
+  try { return (sb ??= createClient(url.trim(), key.trim(), { auth: { persistSession: false }, realtime: { params: { eventsPerSecond: 5 } } })); } catch { return null; } // bad env values must never crash the page
 }
 
 /**
@@ -38,8 +38,8 @@ export function useLive(code: string | null, refetch: () => void, pollMs: number
     document.addEventListener('visibilitychange', onVis); window.addEventListener('online', onOnline);
     let ch: RealtimeChannel | null = null;
     const c = client();
-    if (c) { ch = c.channel(`session:${code}`).on('broadcast', { event: '*' }, kick).subscribe(); }
-    return () => { clearInterval(poll); document.removeEventListener('visibilitychange', onVis); window.removeEventListener('online', onOnline); if (ch && c) c.removeChannel(ch); };
+    try { if (c) ch = c.channel(`session:${code}`).on('broadcast', { event: '*' }, kick).subscribe(); } catch { ch = null; } // polling still works
+    return () => { clearInterval(poll); document.removeEventListener('visibilitychange', onVis); window.removeEventListener('online', onOnline); try { if (ch && c) c.removeChannel(ch); } catch { /* ignore */ } };
   }, [code, pollMs]);
 }
 
