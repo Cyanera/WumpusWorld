@@ -32,13 +32,14 @@ export default function StudentApp({ code }: { code: string }) {
   const [online, setOnline] = React.useState(true);
   const [busy, setBusy] = React.useState(false);
   const fetchedAt = React.useRef(Date.now());
+  const inflight = React.useRef(0);
   const [now, setNow] = React.useState(Date.now());
 
   React.useEffect(() => { setCreds(loadCreds(code)); }, [code]);
   React.useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
 
   const refresh = React.useCallback(async () => {
-    if (!creds) return;
+    if (!creds || inflight.current > 0) return;
     try {
       const d = await api<Payload>('/api/play/state', { pid: creds.pid, token: creds.token });
       fetchedAt.current = Date.now(); setData(d); setOnline(true); setErr(null);
@@ -75,13 +76,28 @@ export default function StudentApp({ code }: { code: string }) {
     } finally { setBusy(false); }
   };
 
+  // Action queue: taps are never dropped; they are sent in order and the UI shows the predicted pose instantly.
+  const chain = React.useRef<Promise<unknown>>(Promise.resolve());
+  const send = (action: string) => {
+    inflight.current++;
+    chain.current = chain.current.then(async () => {
+      try {
+        const d = await api<Payload>('/api/play/action', { body: { action, opId: crypto.randomUUID() }, pid: creds.pid, token: creds.token });
+        if (inflight.current === 1) { fetchedAt.current = Date.now(); setData(d); } // last one in the queue: show the real state
+        setOnline(true); setErr(null);
+      } catch (e) {
+        if (e instanceof ApiError) { setErr(e.code); } else setOnline(false);
+      } finally { inflight.current--; if (inflight.current === 0) refresh(); }
+    });
+  };
+
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-xl flex-col gap-3 px-2 pb-24 pt-2">
       <Header data={data} remaining={remaining} online={online} />
       {err && <div role="alert" className="rounded-xl bg-red-900/60 p-2 text-center text-sm">{errText(err)}</div>}
       {data.session.status === 'lobby' && <WaitCard text="You're in! Waiting for your instructor to start the activity…" />}
       {data.session.status === 'paused' && <WaitCard text="The instructor paused the activity." />}
-      {data.game && <Game data={data} game={data.game} call={call} busy={busy} creds={creds} remaining={remaining} />}
+      {data.game && <Game data={data} game={data.game} call={call} busy={busy} creds={creds} remaining={remaining} send={send} />}
       {!data.game && data.session.status === 'finished' && <WaitCard text="This session has ended. Thank you for playing!" />}
     </main>
   );
@@ -133,14 +149,14 @@ function Header({ data, remaining, online }: { data: Payload; remaining: number;
   );
 }
 
-function Game({ data, game, call, busy, creds, remaining }: { data: Payload; game: StudentGameView; call: (p: string, b: unknown) => Promise<Payload | null>; busy: boolean; creds: Creds; remaining: number }) {
+function Game({ data, game, call, busy, creds, remaining, send }: { data: Payload; game: StudentGameView; call: (p: string, b: unknown) => Promise<Payload | null>; busy: boolean; creds: Creds; remaining: number; send: (action: string) => void }) {
   const [marks, setMarks] = React.useState<Record<string, Label[]>>({});
   const [sel, setSel] = React.useState<Pos | null>(null);
   const [mcq, setMcq] = React.useState<string | null>(null);
   const [freeMode, setFreeMode] = React.useState(false);
   const [hl, setHl] = React.useState<{ s: Pos[]; e: Pos[] }>({ s: [], e: [] });
   const [opt, setOpt] = React.useState<{ x: number; y: number; dir: string } | null>(null);
-  React.useEffect(() => { setOpt(null); }, [game.seq, game.agent.x, game.agent.y, game.agent.dir]);
+  React.useEffect(() => { setOpt(null); }, [data]);
   const pend = game.pending;
   const inferRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => { if (pend) setTimeout(() => inferRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 350); }, [pend?.id]);
@@ -169,7 +185,6 @@ function Game({ data, game, call, busy, creds, remaining }: { data: Payload; gam
     if (d) { setFreeMode(false); setMarks({}); setSel(null); }
   };
   const act = (a: string) => {
-    if (busy) return;
     setHl({ s: [], e: [] });
     // instant (optimistic) feedback; the server stays authoritative and the real state replaces this
     const o = opt ?? { x: game.agent.x, y: game.agent.y, dir: game.agent.dir };
@@ -177,7 +192,7 @@ function Game({ data, game, call, busy, creds, remaining }: { data: Payload; gam
     if (a === 'turn_left') setOpt({ ...o, dir: order[(order.indexOf(o.dir) + 1) % 4] });
     else if (a === 'turn_right') setOpt({ ...o, dir: order[(order.indexOf(o.dir) + 3) % 4] });
     else if (a === 'forward') { const v = ({ E: [1, 0], N: [0, 1], W: [-1, 0], S: [0, -1] } as Record<string, number[]>)[o.dir]; const nx = o.x + v[0], ny = o.y + v[1]; if (nx >= 1 && nx <= 4 && ny >= 1 && ny <= 4) setOpt({ ...o, x: nx, y: ny }); }
-    call('/api/play/action', { action: a }).then((d) => { if (!d) setOpt(null); });
+    send(a);
   };
   const showSquares = (s: Pos[], e: Pos[]) => { setHl({ s, e }); window.scrollTo({ top: 0, behavior: 'smooth' }); setTimeout(() => setHl({ s: [], e: [] }), 5000); };
   const canAct = active && !game.over && !pend;

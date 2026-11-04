@@ -221,42 +221,58 @@ export async function startGame(db: DB, pid: string, token: string | null | unde
 }
 
 async function writeOutput(db: DB, s: Row, p: Row, gameId: string, out: Output, state: GameState, isNew = false) {
-  await db.upsert('knowledge_states', { game_id: gameId, seq: state.seq, knowledge: { cells: compact(engineKnowledge(state)), wumpusDead: !state.agent.wumpusAlive }, updated_at: new Date().toISOString() }, 'game_id');
-  await db.insert('game_events', { id: randomUUID(), game_id: gameId, session_id: s.id, seq: out.event.seq, kind: out.event.kind, payload: out.event });
-  for (const r of out.records) await db.insert('inference_records', { id: randomUUID(), game_id: gameId, session_id: s.id, record_id: r.id, step: r.step, kind: r.kind, record: r });
+  void isNew;
+  const jobs: Promise<unknown>[] = [
+    db.upsert('knowledge_states', { game_id: gameId, seq: state.seq, knowledge: { cells: compact(engineKnowledge(state)), wumpusDead: !state.agent.wumpusAlive }, updated_at: new Date().toISOString() }, 'game_id'),
+    db.insert('game_events', { id: randomUUID(), game_id: gameId, session_id: s.id, seq: out.event.seq, kind: out.event.kind, payload: out.event }),
+  ];
+  for (const r of out.records) jobs.push(db.insert('inference_records', { id: randomUUID(), game_id: gameId, session_id: s.id, record_id: r.id, step: r.step, kind: r.kind, record: r }));
   if (out.attempt) {
     const a = out.attempt;
-    await db.insert('inference_attempts', { id: a.id, game_id: gameId, session_id: s.id, participant_id: p.id, checkpoint_id: a.checkpointId, kind: a.kind, category: a.category, step: a.step, correct: a.correct, cells_correct: a.cellsCorrect, cells_relevant: a.cellsRelevant, misconceptions: a.misconceptions, answer: a.answer, evaluation: a.evaluation ?? null });
+    jobs.push(db.insert('inference_attempts', { id: a.id, game_id: gameId, session_id: s.id, participant_id: p.id, checkpoint_id: a.checkpointId, kind: a.kind, category: a.category, step: a.step, correct: a.correct, cells_correct: a.cellsCorrect, cells_relevant: a.cellsRelevant, misconceptions: a.misconceptions, answer: a.answer, evaluation: a.evaluation ?? null }));
   }
+  await Promise.all(jobs);
 }
 
 type Mutator = (g: Row, world: World) => Output | { error: string };
 
 async function mutate(db: DB, pid: string, token: string | null | undefined, opId: string | undefined, fn: Mutator) {
-  const { p, s } = await auth(db, pid, token);
+  const p = await db.get('participants', pid);
+  if (!p || !tokenMatches(token, p.token_hash)) return fail(401, 'unauthorized');
   for (let attempt = 0; attempt < 3; attempt++) {
-    let g = await latestGame(db, pid);
+    // stage 1: session + latest game in parallel
+    const [s, g] = await Promise.all([db.get('classroom_sessions', p.session_id), latestGame(db, pid)]);
+    if (!s) return fail(404, 'session_not_found');
     if (!g) return fail(404, 'no_game');
     if (g.state.lastOpId && opId && g.state.lastOpId === opId) return getStudentState(db, pid, token); // duplicate delivery
-    if (effectiveStatus(s) === 'finished') { await finalizeTimeout(db, p, s, g); return fail(409, 'session_finished'); }
-    if (effectiveStatus(s) !== 'active') fail(409, 'session_not_active');
-    const world = await loadWorld(db, g.id);
+    const status = effectiveStatus(s);
+    if (status === 'finished') { await finalizeTimeout(db, p, s, g); return fail(409, 'session_finished'); }
+    if (status !== 'active') return fail(409, 'session_not_active');
+    // stage 2: hidden world + existing records in parallel
+    const [world, oldRecords] = await Promise.all([loadWorld(db, g.id), loadRecords(db, g.id)]);
     if (!world) return fail(500, 'world_missing');
     const res = fn(g, world);
-    if ('error' in res) return fail(res.error === 'game_over' ? 409 : 409, res.error);
+    if ('error' in res) return fail(409, res.error);
     const state = res.state; if (opId) state.lastOpId = opId;
     const over = isOver(state);
     const ok = await db.update('game_instances', g.id, { state, version: g.version + 1, score: state.agent.score, status: over ? state.agent.outcome : 'playing', ended_at: over ? new Date().toISOString() : null }, { expectVersion: g.version });
     if (!ok) continue; // concurrent write: reload and retry
-    await writeOutput(db, s, p, g.id, res, state);
-    if (over) {
+    // stage 3: everything else in parallel (no sequential round trips, nothing re-read)
+    const tail: Promise<unknown>[] = [
+      writeOutput(db, s, p, g.id, res, state),
+      db.update('participants', pid, { last_seen: new Date().toISOString(), summary: summarize({ ...emptySummary(), ...p.summary }, state, over, over && !isOver(g.state)) }),
+      broadcast(s.code, over ? 'end' : 'progress', { pid }),
+    ];
+    if (over) tail.push((async () => {
       const attempts = await db.list('inference_attempts', { game_id: g.id });
-      const report = buildReport(state, attempts.map((a) => ({ category: a.category, correct: a.correct, misconceptions: a.misconceptions ?? [] })));
+      const all = res.attempt ? [...attempts, { category: res.attempt.category, correct: res.attempt.correct, misconceptions: res.attempt.misconceptions }] : attempts;
+      const report = buildReport(state, all.map((a: any) => ({ category: a.category, correct: a.correct, misconceptions: a.misconceptions ?? [] })));
       await db.upsert('assessment_results', { game_id: g.id, session_id: s.id, participant_id: p.id, report }, 'game_id');
-    }
-    await db.update('participants', pid, { last_seen: new Date().toISOString(), summary: summarize({ ...emptySummary(), ...p.summary }, state, over, over && !isOver(g.state)) });
-    await broadcast(s.code, over ? 'end' : 'progress', { pid });
-    return getStudentState(db, pid, token);
+    })());
+    await Promise.all(tail);
+    const records = [...oldRecords, ...res.records];
+    const w = over ? world : null;
+    return studentPayload(s, { ...p, last_seen: new Date().toISOString() }, { ...g, state }, records, w);
   }
   return fail(409, 'conflict');
 }
