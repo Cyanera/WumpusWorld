@@ -40,7 +40,7 @@ export function CaveGrid({ cells, agent, world, marks = {}, highlight = [], elim
   const cols = [1, 2, 3, 4];
   const at = (x: number, y: number) => cells.find((c) => c.x === x && c.y === y)!;
   return (
-    <div className="mx-auto w-full max-w-[560px]">
+    <div dir="ltr" className="mx-auto w-full max-w-[560px]">
     <div className="mb-0.5 flex items-center justify-between px-2 text-[11px] font-bold text-slate-400" aria-hidden><span>N ↑ (y up)</span><span>E → (x right)</span></div>
     <div className={cn('relative aspect-square w-full select-none rounded-3xl border-4 border-cave-600 bg-cave-950 p-1.5 shadow-2xl', className)}
       role="grid" aria-label="Cave map, 4 by 4. Coordinate [1,1] is bottom-left.">

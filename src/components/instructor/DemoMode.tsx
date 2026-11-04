@@ -10,12 +10,12 @@ import { Replay } from '../game/Replay';
 export default function DemoMode({ code }: { code: string }) {
   const [src, setSrc] = React.useState<'fresh' | string>('fresh');
   const [students, setStudents] = React.useState<any[]>([]);
-  const [data, setData] = React.useState<any>(null); const [loading, setLoading] = React.useState(false);
+  const [data, setData] = React.useState<any>(null); const [loading, setLoading] = React.useState(false); const [err, setErr] = React.useState('');
   const [view, setView] = React.useState<'natural' | 'formal' | 'both'>('both'); const [nonce, setNonce] = React.useState(0);
-  React.useEffect(() => { api('/api/instructor/sessions/' + code).then((d) => { setStudents(d.students.filter((s: any) => s.gameId)); setView(d.session.logic.view); }).catch(() => (location.href = '/instructor')); }, [code]);
+  React.useEffect(() => { api('/api/instructor/sessions/' + code).then((d) => { setStudents(d.students.filter((s: any) => s.gameId)); setView(d.session.logic.view); }).catch((e: any) => { if (e?.status === 401 || e?.status === 403) location.href = '/instructor'; else setErr('تعذر تحميل بيانات الجلسة'); }); }, [code]);
   React.useEffect(() => {
-    setLoading(true);
-    (src === 'fresh' ? api('/api/instructor/demo', { body: {} }) : api(`/api/instructor/sessions/${code}/students/${src}`)).then((d) => setData(d)).finally(() => setLoading(false));
+    setLoading(true); setErr('');
+    (src === 'fresh' ? api('/api/instructor/demo', { body: {} }) : api(`/api/instructor/sessions/${code}/students/${src}`)).then((d) => setData(d)).catch((e: any) => { if (e?.status === 401 || e?.status === 403) location.href = '/instructor'; else setErr('تعذر تحميل العرض، حاولي مرة ثانية'); }).finally(() => setLoading(false));
   }, [src, nonce, code]);
   return (
     <main dir="rtl" lang="ar" className="min-h-screen bg-cave-950 p-4 text-xl">
@@ -30,7 +30,7 @@ export default function DemoMode({ code }: { code: string }) {
           <Button variant="outline" onClick={() => document.documentElement.requestFullscreen?.()}><Maximize2 />ملء الشاشة</Button>
         </div>
       </header>
-      {loading || !data ? <p className="p-20 text-center">جارٍ التحميل…</p> : (data.events ?? []).length === 0 ? <p className="p-20 text-center text-slate-400"><Users className="mx-auto" />لا توجد لعبة مسجلة لهذه الطالبة بعد.</p> :
+      {err ? <div className="p-20 text-center"><p className="text-red-300">{err}</p><Button className="mt-3" onClick={() => setNonce(nonce + 1)}>إعادة المحاولة</Button></div> : loading || !data ? <p className="p-20 text-center">جارٍ التحميل…</p> : (data.events ?? []).length === 0 ? <p className="p-20 text-center text-slate-400"><Users className="mx-auto" />لا توجد لعبة مسجلة لهذه الطالبة بعد.</p> :
         <Replay key={(src === 'fresh' ? nonce : src) + (data.game?.id ?? '')} events={data.events} records={data.records} world={data.world} logicView={view} large />}
     </main>
   );
