@@ -1,6 +1,8 @@
 import { handler, instructorId, json } from '@/lib/server/http';
 import { perfectPlaythrough } from '@/lib/engine/demo';
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
 /** Fresh random demo game played by a perfect knowledge-based agent (instructor only: includes the hidden world). */
 export const POST = handler(async (req) => {
   instructorId(req);

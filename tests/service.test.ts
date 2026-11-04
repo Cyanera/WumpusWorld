@@ -163,7 +163,7 @@ describe('guided mode flow + dashboard real-time data', () => {
     expect(o.analytics.categories.find((c) => c.id === 'percept_understanding')!.total).toBeGreaterThan(0);
     // detail + replay data
     const d = await studentDetail(db, s, a.participantId);
-    expect(d!.events.length).toBeGreaterThan(5); expect(d!.records.length).toBeGreaterThan(0); expect(d!.world).not.toBeNull();
+    expect(d!.events!.length).toBeGreaterThan(5); expect(d!.records!.length).toBeGreaterThan(0); expect(d!.world).not.toBeNull();
     // exports
     const t = await exportTables(db, s);
     expect(t.students.length).toBe(2); expect(toCSV(t.students)).toContain('Student A');

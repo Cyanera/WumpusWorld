@@ -99,7 +99,7 @@ let singleton: DB | null = null;
 export function getDB(): DB {
   if (singleton) return singleton;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (url && key) singleton = new SupabaseDB(createClient(url, key, { auth: { persistSession: false } }));
+  if (url && key) singleton = new SupabaseDB(createClient(url, key, { auth: { persistSession: false }, global: { fetch: (u: any, o: any) => fetch(u, { ...o, cache: 'no-store' }) } }));
   else {
     const g = globalThis as any;
     g.__wwMemDB ??= new MemoryDB();

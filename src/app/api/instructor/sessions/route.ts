@@ -1,6 +1,8 @@
 import { body, handler, instructorId, json } from '@/lib/server/http';
 import { createSession, sessionPublic } from '@/lib/server/service';
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
 export const GET = handler(async (req, _c, db) => {
   const id = instructorId(req);
   const rows = await db.list('classroom_sessions', { instructor_id: id }, { order: 'created_at', desc: true, limit: 50 });

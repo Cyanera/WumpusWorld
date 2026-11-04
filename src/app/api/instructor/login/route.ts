@@ -2,6 +2,8 @@ import { body, handler, json } from '@/lib/server/http';
 import { COOKIE, checkInstructorPassword, makeInstructorCookie } from '@/lib/server/auth';
 import { ensureInstructor } from '@/lib/server/service';
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
 const fails = new Map<string, { n: number; t: number }>();
 export const POST = handler(async (req, _c, db) => {
   const b = await body(req);
