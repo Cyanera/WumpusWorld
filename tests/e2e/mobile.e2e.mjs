@@ -29,7 +29,7 @@ await page.waitForSelector('text=What does the agent perceive?');
 await page.screenshot({ path: `${OUT}/student-1.png`, fullPage: true });
 const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
 assert(overflow <= 1, `horizontal scroll on phone: ${overflow}px`);
-const btn = await page.locator('button:has-text("Move Forward")').boundingBox();
+const btn = await page.locator('button:has-text("Forward")').boundingBox();
 assert(btn.height >= 44, 'touch target >= 44px');
 
 // play a few moves, answering checkpoints
@@ -37,13 +37,13 @@ for (let i = 0; i < 6; i++) {
   const cp = page.locator('button:has-text("Check My Inference")');
   if (await cp.count()) {
     // blocked actions while checkpoint pending
-    assert(await page.locator('button:has-text("Move Forward")').isDisabled(), 'actions disabled while checkpoint pending');
+    assert(await page.locator('button:has-text("Forward")').isDisabled(), 'actions disabled while checkpoint pending');
     if (await page.locator('[role=radio]').count()) await page.locator('[role=radio]').first().click();
     await cp.first().click();
     await page.waitForTimeout(500);
     continue;
   }
-  await page.click('button:has-text("Move Forward")'); await page.waitForTimeout(500);
+  await page.click('button:has-text("Forward")'); await page.waitForTimeout(500);
 }
 await page.screenshot({ path: `${OUT}/student-2.png`, fullPage: true });
 await page.click('text=Behind the Agent');

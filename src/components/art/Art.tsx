@@ -120,15 +120,14 @@ export function GlitterFx({ className = '' }: P) {
   );
 }
 
-/** Cute explorer robot; the ring pointer shows the facing direction. */
-export function AgentArt({ dir = 'E', alive = true, className = '' }: { dir?: string; alive?: boolean; className?: string }) {
-  const rot = { E: 0, N: -90, W: 180, S: 90 }[dir] ?? 0;
+/** Cute explorer robot; the big cyan arrow shows the facing direction and rotates smoothly. */
+export function AgentArt({ angle = 0, alive = true, className = '' }: { angle?: number; alive?: boolean; className?: string }) {
   return (
-    <svg viewBox="0 0 100 100" className={`${base} ${className}`} role="img" aria-label={`Agent facing ${dir}`}>
+    <svg viewBox="0 0 100 100" className={`${base} ${className}`} role="img" aria-label="Agent">
       <defs><linearGradient id="abody" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#f8fafc" /><stop offset="1" stopColor="#94a3b8" /></linearGradient></defs>
-      <g transform={`rotate(${rot} 50 50)`}>
-        <path d="M92 50 L78 41 L78 59 Z" fill="#22d3ee" stroke="#0e7490" strokeWidth="2" />
-        <circle cx="50" cy="50" r="38" fill="none" stroke="#22d3ee" strokeWidth="2.5" strokeDasharray="4 5" opacity=".8" />
+      <g style={{ transform: `rotate(${angle}deg)`, transformOrigin: '50px 50px', transition: 'transform .35s cubic-bezier(.4,0,.2,1)' }}>
+        <circle cx="50" cy="50" r="40" fill="none" stroke="#22d3ee" strokeWidth="2" strokeDasharray="3 5" opacity=".7" />
+        <path d="M99 50 L80 36 L84 50 L80 64 Z" fill="#22d3ee" stroke="#083344" strokeWidth="2.5" strokeLinejoin="round" />
       </g>
       <g className={alive ? 'fx-bob' : ''}>
         <line x1="50" y1="22" x2="50" y2="12" stroke="#475569" strokeWidth="3" /><circle cx="50" cy="10" r="4" fill="#f43f5e" />

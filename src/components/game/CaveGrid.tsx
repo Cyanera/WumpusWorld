@@ -27,13 +27,22 @@ export interface CaveGridProps {
 }
 const same = (a: Pos, b: Pos) => a.x === b.x && a.y === b.y;
 
+const ANG: Record<string, number> = { E: 0, N: -90, W: -180, S: -270 };
+
 export function CaveGrid({ cells, agent, world, marks = {}, highlight = [], eliminated = [], selected, onCellClick, clickable, wumpusDead, goldTaken, className }: CaveGridProps) {
   const reduce = useReducedMotion();
+  // cumulative angle so turns always rotate the short way (no 270° spin)
+  const ang = React.useRef(ANG[agent.dir] ?? 0);
+  { const target = ANG[agent.dir] ?? 0; let d = (((target - ang.current) % 360) + 540) % 360 - 180; if (d !== 0) ang.current += d; }
+  const DV: Record<string, [number, number]> = { E: [1, 0], N: [0, 1], W: [-1, 0], S: [0, -1] };
+  const front = { x: agent.x + (DV[agent.dir]?.[0] ?? 0), y: agent.y + (DV[agent.dir]?.[1] ?? 0) };
   const rows = [4, 3, 2, 1];
   const cols = [1, 2, 3, 4];
   const at = (x: number, y: number) => cells.find((c) => c.x === x && c.y === y)!;
   return (
-    <div className={cn('relative mx-auto aspect-square w-full max-w-[560px] select-none rounded-3xl border-4 border-cave-600 bg-cave-950 p-1.5 shadow-2xl', className)}
+    <div className="mx-auto w-full max-w-[560px]">
+    <div className="mb-0.5 flex items-center justify-between px-2 text-[11px] font-bold text-slate-400" aria-hidden><span>N ↑ (y up)</span><span>E → (x right)</span></div>
+    <div className={cn('relative aspect-square w-full select-none rounded-3xl border-4 border-cave-600 bg-cave-950 p-1.5 shadow-2xl', className)}
       role="grid" aria-label="Cave map, 4 by 4. Coordinate [1,1] is bottom-left.">
       <div className="grid h-full w-full grid-cols-4 grid-rows-4 gap-1">
         {rows.flatMap((y) => cols.map((x) => {
@@ -78,6 +87,7 @@ export function CaveGrid({ cells, agent, world, marks = {}, highlight = [], elim
                 {c.wumpus === 'possible' && <LabelChip label="possible_wumpus" />}{c.wumpus === 'confirmed' && <LabelChip label="confirmed_wumpus" />}
               </div>
               {m.length > 0 && <div className="absolute bottom-4 left-0.5 right-0.5 flex flex-wrap justify-center gap-0.5 rounded bg-black/60 p-0.5">{m.map((l) => <LabelChip key={l} label={l} />)}</div>}
+              {same(front, p) && agent.alive && <span aria-hidden className="pointer-events-none absolute inset-0 flex items-center justify-center"><span className="rounded-full bg-cyan-400/25 px-2 text-3xl font-black leading-none text-cyan-200 ring-2 ring-cyan-300/60" style={{ transform: `rotate(${ANG[agent.dir]}deg)` }}>➤</span></span>}
               {c.visited && !isAgent && c.breeze && <span className="sr-only">Breeze here</span>}
             </button>
           );
@@ -88,9 +98,10 @@ export function CaveGrid({ cells, agent, world, marks = {}, highlight = [], elim
         style={{ width: 'calc((100% - 12px - 12px) / 4)', height: 'calc((100% - 12px - 12px) / 4)' }}
         initial={false}
         animate={{ left: `calc(6px + ${(agent.x - 1)} * ((100% - 12px - 12px) / 4 + 4px))`, top: `calc(6px + ${(4 - agent.y)} * ((100% - 12px - 12px) / 4 + 4px))` }}
-        transition={reduce ? { duration: 0 } : { type: 'spring', stiffness: 220, damping: 22 }}>
-        <div className="absolute inset-[8%]"><AgentArt dir={agent.dir} alive={agent.alive} /></div>
+        transition={reduce ? { duration: 0 } : { duration: 0.32, ease: [0.4, 0, 0.2, 1] }}>
+        <div className="absolute inset-[8%]"><AgentArt angle={ang.current} alive={agent.alive} /></div>
       </motion.div>
+    </div>
     </div>
   );
 }

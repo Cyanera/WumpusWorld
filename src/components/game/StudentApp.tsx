@@ -139,7 +139,11 @@ function Game({ data, game, call, busy, creds, remaining }: { data: Payload; gam
   const [mcq, setMcq] = React.useState<string | null>(null);
   const [freeMode, setFreeMode] = React.useState(false);
   const [hl, setHl] = React.useState<{ s: Pos[]; e: Pos[] }>({ s: [], e: [] });
+  const [opt, setOpt] = React.useState<{ x: number; y: number; dir: string } | null>(null);
+  React.useEffect(() => { setOpt(null); }, [game.seq, game.agent.x, game.agent.y, game.agent.dir]);
   const pend = game.pending;
+  const inferRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => { if (pend) setTimeout(() => inferRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 350); }, [pend?.id]);
   const active = data.session.status === 'active';
   React.useEffect(() => { setMarks({}); setSel(null); setMcq(null); }, [pend?.id]);
   const labelsAllowed: Label[] = pend?.type === 'map' ? TASK_LABELS[pend.taskMode ?? 'full'] : freeMode ? TASK_LABELS.full : [];
@@ -164,21 +168,45 @@ function Game({ data, game, call, busy, creds, remaining }: { data: Payload; gam
     const d = await call('/api/play/checkpoint', body);
     if (d) { setFreeMode(false); setMarks({}); setSel(null); }
   };
-  const act = (a: string) => { setHl({ s: [], e: [] }); call('/api/play/action', { action: a }); };
+  const act = (a: string) => {
+    if (busy) return;
+    setHl({ s: [], e: [] });
+    // instant (optimistic) feedback; the server stays authoritative and the real state replaces this
+    const o = opt ?? { x: game.agent.x, y: game.agent.y, dir: game.agent.dir };
+    const order = ['E', 'N', 'W', 'S'];
+    if (a === 'turn_left') setOpt({ ...o, dir: order[(order.indexOf(o.dir) + 1) % 4] });
+    else if (a === 'turn_right') setOpt({ ...o, dir: order[(order.indexOf(o.dir) + 3) % 4] });
+    else if (a === 'forward') { const v = ({ E: [1, 0], N: [0, 1], W: [-1, 0], S: [0, -1] } as Record<string, number[]>)[o.dir]; const nx = o.x + v[0], ny = o.y + v[1]; if (nx >= 1 && nx <= 4 && ny >= 1 && ny <= 4) setOpt({ ...o, x: nx, y: ny }); }
+    call('/api/play/action', { action: a }).then((d) => { if (!d) setOpt(null); });
+  };
   const showSquares = (s: Pos[], e: Pos[]) => { setHl({ s, e }); window.scrollTo({ top: 0, behavior: 'smooth' }); setTimeout(() => setHl({ s: [], e: [] }), 5000); };
-  const canAct = active && !game.over && !pend && !busy;
+  const canAct = active && !game.over && !pend;
 
   return (
     <>
-      <CaveGrid cells={game.cells} agent={game.agent} world={game.world} marks={mapMode ? marks : {}} highlight={hl.s} eliminated={hl.e} selected={mapMode ? sel : null}
+      <CaveGrid cells={game.cells} agent={{ ...game.agent, ...(opt ?? {}) }} world={game.world} marks={mapMode ? marks : {}} highlight={hl.s} eliminated={hl.e} selected={mapMode ? sel : null}
         wumpusDead={!game.agent.wumpusAlive} goldTaken={game.agent.hasGold}
         onCellClick={mapMode ? (p) => setSel(p) : undefined} clickable={(c) => mapMode && !c.visited} />
       <AnimatePresence>{game.over && <Ending game={game} creds={creds} call={call} active={active} />}</AnimatePresence>
 
+      {!game.over && (
+        <section aria-label="Actions" className="sticky bottom-2 z-20 rounded-2xl border border-cave-600 bg-cave-900/95 p-2 shadow-xl backdrop-blur">
+          <div className="grid grid-cols-7 gap-1">
+            <ActBtn icon={<RotateCcw />} label="Left" onClick={() => act('turn_left')} disabled={!canAct} />
+            <ActBtn icon={<ArrowUp style={{ transform: `rotate(${({ E: 90, N: 0, W: -90, S: 180 } as Record<string, number>)[(opt ?? game.agent).dir]}deg)`, transition: 'transform .3s' }} />} label="Forward" onClick={() => act('forward')} disabled={!canAct} primary wide />
+            <ActBtn icon={<RotateCw />} label="Right" onClick={() => act('turn_right')} disabled={!canAct} />
+            <ActBtn icon={<Hand />} label="Grab" onClick={() => act('grab')} disabled={!canAct} />
+            <ActBtn icon={<Crosshair />} label={game.agent.hasArrow ? 'Shoot' : 'No arrow'} onClick={() => act('shoot')} disabled={!canAct || !game.agent.hasArrow} />
+            <ActBtn icon={<DoorOpen />} label="Climb" onClick={() => act('climb')} disabled={!canAct} />
+          </div>
+          <p className="mt-1 text-center text-xs text-slate-300">Facing <b className="text-cyan-300">{({ E: 'East →', N: 'North ↑', W: 'West ←', S: 'South ↓' } as Record<string, string>)[(opt ?? game.agent).dir]}</b> · Score {game.score} · Gold {game.agent.hasGold ? '✔ carried' : 'not yet'}{!active ? ' · on hold' : ''}</p>
+        </section>
+      )}
+
       <Card><CardHeader><CardTitle>What does the agent perceive?</CardTitle></CardHeader><CardContent><PerceptStrip p={game.percepts as unknown as Record<string, boolean>} /></CardContent></Card>
 
       {!game.over && (
-        <Card className={cn(pend && 'border-amber-500 shadow-amber-500/20')}><CardHeader><CardTitle>What can the agent infer?</CardTitle></CardHeader>
+        <Card ref={inferRef as any} className={cn(pend && 'border-amber-500 shadow-amber-500/20')}><CardHeader><CardTitle>What can the agent infer?</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             {pend ? (<>
               <p className="font-semibold">{pend.prompt}</p>{pend.hint && <p className="text-sm text-slate-300">💡 {pend.hint}</p>}
@@ -199,21 +227,6 @@ function Game({ data, game, call, busy, creds, remaining }: { data: Payload; gam
           </CardContent></Card>
       )}
 
-      {!game.over && (
-        <Card><CardHeader><CardTitle>What should the agent do next?</CardTitle></CardHeader><CardContent>
-          <div className="grid grid-cols-3 gap-2">
-            <ActBtn icon={<RotateCcw />} label="Turn Left" onClick={() => act('turn_left')} disabled={!canAct} />
-            <ActBtn icon={<ArrowUp />} label="Move Forward" onClick={() => act('forward')} disabled={!canAct} primary />
-            <ActBtn icon={<RotateCw />} label="Turn Right" onClick={() => act('turn_right')} disabled={!canAct} />
-            <ActBtn icon={<Hand />} label="Grab" onClick={() => act('grab')} disabled={!canAct} />
-            <ActBtn icon={<Crosshair />} label={game.agent.hasArrow ? 'Shoot (1)' : 'No arrow'} onClick={() => act('shoot')} disabled={!canAct || !game.agent.hasArrow} />
-            <ActBtn icon={<DoorOpen />} label="Climb" onClick={() => act('climb')} disabled={!canAct} />
-          </div>
-          <p className="mt-2 text-center text-xs text-slate-400">Facing <b>{({ E: 'East →', N: 'North ↑', W: 'West ←', S: 'South ↓' } as Record<string, string>)[game.agent.dir]}</b> · Game score {game.score} · Gold {game.agent.hasGold ? '✔ carried' : 'not yet'}</p>
-          {!active && <p className="mt-2 text-center text-sm text-amber-300">Actions are on hold.</p>}
-        </CardContent></Card>
-      )}
-
       <Thinking game={game} onShow={showSquares} />
       <KnowledgePanel game={game} />
       <LogicSection records={game.records} available={data.logic.available} enabled={data.logic.enabled} view={data.logic.view} onShow={showSquares} />
@@ -222,8 +235,9 @@ function Game({ data, game, call, busy, creds, remaining }: { data: Payload; gam
   );
 }
 
-const ActBtn = ({ icon, label, onClick, disabled, primary }: { icon: React.ReactNode; label: string; onClick: () => void; disabled: boolean; primary?: boolean }) => (
-  <Button variant={primary ? 'default' : 'secondary'} onClick={onClick} disabled={disabled} className="h-[72px] flex-col gap-1 text-sm leading-tight">{icon}<span>{label}</span></Button>
+const ActBtn = ({ icon, label, onClick, disabled, primary, wide }: { icon: React.ReactNode; label: string; onClick: () => void; disabled: boolean; primary?: boolean; wide?: boolean }) => (
+  <Button variant={primary ? 'default' : 'secondary'} onClick={onClick} disabled={disabled}
+    className={cn('h-14 flex-col gap-0.5 px-0 text-[11px] leading-tight [&>svg]:h-5 [&>svg]:w-5', wide && 'col-span-2 h-14 text-sm')}>{icon}<span>{label}</span></Button>
 );
 
 function MapLabeler({ allowed, sel, marks, onToggle }: { allowed: Label[]; sel: Pos | null; marks: Record<string, Label[]>; onToggle: (l: Label) => void }) {
