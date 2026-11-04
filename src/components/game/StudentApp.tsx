@@ -33,6 +33,7 @@ export default function StudentApp({ code }: { code: string }) {
   const [busy, setBusy] = React.useState(false);
   const fetchedAt = React.useRef(Date.now());
   const inflight = React.useRef(0);
+  const chain = React.useRef<Promise<unknown>>(Promise.resolve());
   const [now, setNow] = React.useState(Date.now());
 
   React.useEffect(() => { setCreds(loadCreds(code)); }, [code]);
@@ -77,7 +78,6 @@ export default function StudentApp({ code }: { code: string }) {
   };
 
   // Action queue: taps are never dropped; they are sent in order and the UI shows the predicted pose instantly.
-  const chain = React.useRef<Promise<unknown>>(Promise.resolve());
   const send = (action: string) => {
     inflight.current++;
     chain.current = chain.current.then(async () => {

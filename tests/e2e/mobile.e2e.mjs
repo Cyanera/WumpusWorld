@@ -20,6 +20,8 @@ const browser = await chromium.launch();
 const ctx = await browser.newContext({ ...devices['iPhone 13'] });
 const page = await ctx.newPage();
 const bodies = [];
+const pageErrors = [];
+page.on('pageerror', (e) => pageErrors.push(e.message));
 page.on('response', async (r) => { if (r.url().includes('/api/play/') && !r.url().includes('replay')) { try { bodies.push(await r.text()); } catch {} } });
 await page.goto(`${BASE}/play/${sess.code}`);
 await page.fill('input', 'Sara');
@@ -51,6 +53,8 @@ await page.screenshot({ path: `${OUT}/student-3-logic.png`, fullPage: true });
 const all = bodies.join('\n');
 if (!all.includes('"outcome":"dead"') && !all.includes('"over":true')) { assert(!all.includes('"pits"'), 'hidden pits leaked'); assert(!all.includes('"gold":{'), 'hidden gold leaked'); }
 assert((await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 1, 'no horizontal scroll after play');
+
+assert.deepEqual(pageErrors, [], 'client-side exceptions: ' + pageErrors.join(' | '));
 
 // instructor dashboard
 const dctx = await browser.newContext({ viewport: { width: 1600, height: 900 } });
